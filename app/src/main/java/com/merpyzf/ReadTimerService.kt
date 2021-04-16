@@ -25,7 +25,7 @@ const val TAG = "wk"
 
 class ReadTimerService : Service() {
     private lateinit var book: Book
-    private lateinit var timerBinder: TimerBinder
+    private lateinit var myServiceBinder: MyServiceBinder
     private lateinit var receiver: BroadcastReceiver
     private lateinit var notification: Notification
     private lateinit var notificationLayout: RemoteViews
@@ -52,19 +52,18 @@ class ReadTimerService : Service() {
     }
 
     override fun onDestroy() {
-        Log.d(TAG, "onDestroy")
+        myServiceBinder.release()
         unregisterReceiver(receiver)
+        stopTimerService()
+        Log.d(TAG, "onDestroy")
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent): IBinder {
-        val name = intent.getStringExtra("name")!!
-        val cover = intent.getStringExtra("cover")!!
-        timerBinder = TimerBinder(this, Book(name, cover))
+        myServiceBinder = MyServiceBinder(this)
         // init notification status
         updateNotificationTimingStatus(this)
-        Log.d(TAG, "onBind")
-        return timerBinder
+        return myServiceBinder
     }
 
     private fun registerScreenBroadcastReceiver(context: Context): ScreenBroadcastReceiver {
@@ -81,7 +80,63 @@ class ReadTimerService : Service() {
         return receiver
     }
 
-    inner class TimerBinder(private val context: Service, private var book: Book) : Binder() {
+    inner class MyServiceBinder(context: Service) : Binder() {
+        private var timerWrapper = TimerWrapper(context)
+        private var musicPlayer = MusicPlayer(context)
+
+        var timingListener: Timer.OnTimingListener? = null
+            set(value) {
+                timerWrapper.timingListener = value
+                field = value
+            }
+
+        /**
+         * start timing
+         * @param isCountDown countdown flag
+         * @param countDownSeconds countdown seconds
+         */
+        fun startTiming(isCountDown: Boolean = false, countDownSeconds: Long = 0L) =
+            timerWrapper.startTiming(isCountDown, countDownSeconds)
+
+        /**
+         * stop timing
+         */
+        fun stopTiming() = timerWrapper.stopTiming()
+
+        /**
+         * pause timing
+         */
+        fun pauseTiming(screenOff: Boolean = false) = timerWrapper.pauseTiming(screenOff)
+
+        /**
+         * resume timing
+         * @param pauseDuration from pause to resume duration
+         */
+        fun resumeTiming(pauseDuration: Long = 0) = timerWrapper.resumeTiming(pauseDuration)
+
+        /**
+         * get current timer status
+         */
+        fun currentStatus(): Timer.Status = timerWrapper.currentStatus()
+
+        fun playMusic(source: String) {
+            musicPlayer.playMusic(source)
+        }
+
+        fun pauseMusic() {
+            musicPlayer.pauseMusic()
+        }
+
+        fun resumeMusic() {
+            musicPlayer.resumeMusic()
+        }
+
+        fun release() {
+            musicPlayer.release()
+        }
+    }
+
+    private inner class TimerWrapper(private val context: Service) {
         var timingListener: Timer.OnTimingListener? = null
         private var timer: Timer? = null
 
@@ -198,8 +253,7 @@ class ReadTimerService : Service() {
     }
 
     private fun updateNotificationTimingStatus(context: Service) {
-        val status = timerBinder.currentStatus()
-        when (status) {
+        when (myServiceBinder.currentStatus()) {
             Timer.Status.PREPARE -> {
                 notificationLayout.setViewVisibility(R.id.stopContainer, View.GONE)
                 notificationLayout.setViewVisibility(R.id.statusContainer, View.VISIBLE)
@@ -247,42 +301,41 @@ class ReadTimerService : Service() {
             intent?.let {
                 when (it.action) {
                     Intent.ACTION_SCREEN_ON -> {
-                        if (timerBinder.currentStatus() != Timer.Status.PAUSE_CAUSE_SCREEN_OFF) {
+                        if (myServiceBinder.currentStatus() != Timer.Status.PAUSE_CAUSE_SCREEN_OFF) {
                             return
                         }
                         screenOnTimeMillis = System.currentTimeMillis()
-                        Log.i(
-                            "wk",
-                            "duration: ${(screenOnTimeMillis - screenOffTimeMillis) / 1000}"
-                        )
-                        timerBinder.resumeTiming((screenOnTimeMillis - screenOffTimeMillis) / 1000)
+                        myServiceBinder.resumeTiming((screenOnTimeMillis - screenOffTimeMillis) / 1000)
                         screenOffTimeMillis = 0L
                     }
                     Intent.ACTION_SCREEN_OFF -> {
-                        if (timerBinder.currentStatus() != Timer.Status.RUNNING) {
+                        if (myServiceBinder.currentStatus() != Timer.Status.RUNNING) {
                             return
                         }
                         screenOffTimeMillis = System.currentTimeMillis()
-                        timerBinder.pauseTiming(true)
+                        myServiceBinder.pauseTiming(true)
                     }
                     Intent.ACTION_SHUTDOWN -> {
-                        Log.i("wk", "the device will shutdown，do some save action.")
-                        timerBinder.stopTiming()
+                        myServiceBinder.stopTiming()
                         stopTimerService()
                     }
                     ACTION_RESUME_OR_PAUSE_COUNT -> {
-                        if (timerBinder.currentStatus() == Timer.Status.PREPARE) {
-                            timerBinder.startTiming()
-                        } else if (timerBinder.currentStatus() == Timer.Status.RUNNING) {
-                            timerBinder.pauseTiming()
-                        } else if (timerBinder.currentStatus() == Timer.Status.PAUSE) {
-                            timerBinder.resumeTiming()
+                        when {
+                            myServiceBinder.currentStatus() == Timer.Status.PREPARE -> {
+                                myServiceBinder.startTiming()
+                            }
+                            myServiceBinder.currentStatus() == Timer.Status.RUNNING -> {
+                                myServiceBinder.pauseTiming()
+                            }
+                            myServiceBinder.currentStatus() == Timer.Status.PAUSE -> {
+                                myServiceBinder.resumeTiming()
+                            }
                         }
                         updateNotificationTimingStatus(this@ReadTimerService)
                     }
                     ACTION_FINISH_READ -> {
-                        if (timerBinder.currentStatus() != Timer.Status.PREPARE || timerBinder.currentStatus() != Timer.Status.STOP) {
-                            timerBinder.stopTiming()
+                        if (myServiceBinder.currentStatus() != Timer.Status.PREPARE || myServiceBinder.currentStatus() != Timer.Status.STOP) {
+                            myServiceBinder.stopTiming()
                             updateNotificationTimingStatus(this@ReadTimerService)
                         }
                     }

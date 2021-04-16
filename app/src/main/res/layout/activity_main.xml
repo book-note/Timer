@@ -47,4 +47,61 @@
         android:layout_height="wrap_content"
         android:text="停止计时" />
 
+    <Button
+        android:id="@+id/btnPlayMusic"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="36dp"
+        android:backgroundTint="@color/teal_200"
+        android:text="播放白噪音" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        >
+        <Button
+            android:id="@+id/btnPauseMusic"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:backgroundTint="@color/teal_200"
+            android:text="暂停白噪音" />
+        <Button
+            android:id="@+id/btnStartMusic"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginStart="18dp"
+            android:layout_height="wrap_content"
+            android:backgroundTint="@color/teal_200"
+            android:text="恢复白噪音" />
+
+
+    </LinearLayout>
+
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnPlayPreMusic"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:backgroundTint="@color/teal_200"
+            android:text="上一首" />
+
+        <Button
+            android:id="@+id/btnPlayNextMusic"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="18dp"
+            android:layout_weight="1"
+            android:backgroundTint="@color/teal_200"
+            android:text="下一首" />
+    </LinearLayout>
+
+
 </LinearLayout>
